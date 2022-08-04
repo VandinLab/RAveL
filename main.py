@@ -168,7 +168,7 @@ if exp_version == 13:
 
 
 ds_sizes = [100,250,500,1000,5000,10000,25000,50000,100000,250000]
-ds_sizes = [100,250]  # for debugging
+# ds_sizes = [100,250]  # for debugging
 versions = [1]
 ts = [i for i in range(stop_iteration)]
 
