@@ -18,14 +18,7 @@ from fcit import fcit
 import rad_utils
 from threadpoolctl import threadpool_limits
 import multiprocess as mp
-try:
-    import rpy2.robjects as robjects
-    from rpy2.robjects import pandas2ri
-    from rpy2.robjects.packages import SignatureTranslatedAnonymousPackage as STAP
-    from rpy2.robjects.conversion import localconverter
-except:
-    print("ERROR WHILE IMPORTING RPY2 LIB")
-
+from pgmpy.base import DAG
 
 def count_elements(seq, keys = []) -> dict:
     """Utility function to count element of each histogram bar."""
@@ -282,9 +275,10 @@ def calculate_dependency_python(dep_infos, t, x, z_str, z):
                 
             dep_infos.save_counter += 1
     elif method == "permutation":
-        permutation_based_IT(dep_infos, t, x, z, z_str)
+        raise Exception("permutation_based_IT not implemented yet")
+        # permutation_based_IT(dep_infos, t, x, z, z_str)
     else:
-        raise Error("CALCULUS OF SUMMAND AD HOC NOT IMPLEMENTED YET")
+        raise Exception("CALCULUS OF SUMMAND AD HOC NOT IMPLEMENTED YET")
 
 def calculate_residuals(target,data):
     reg = LinearRegression().fit(data, target)
@@ -317,121 +311,14 @@ def calculate_t_test(x,y,z=[]):
 def save_IT_dataframe(dep_infos):
     dep_infos.df.to_csv(dep_infos.indep_file,sep = ";")
 
-def get_mb(v, dag_struc):
-    r_code = '''
-        library(bnlearn)
-        calculate_mb <- function(v, dag_struc){
-            dag = model2network(dag_struc)
-            return <- mb(dag,v)
-        }
-    '''
-    testy = STAP(r_code, "testy")
-    #Invoking the R function and getting the result
+def get_mb(v, dag):
+    return dag.get_markov_blanket(v)
+    
+def get_pc(v, dag):
+    res = dag.get_parents(v) + dag.get_children(v)
+    res = [e for e in set(res)]
+    return res
 
-    if "[" not in dag_struc:
-        
-        dag_struc =dependencyInfos.initialize_dag_struc(dag_struc)
-    mb = testy.calculate_mb(v,dag_struc)
-    return [el for el in mb]
+def get_parents(v, dag):
+    return dag.get_parents(v)
 
-def get_el_dist_le_2(v, dag_struc):
-    r_code = '''
-        library(bnlearn)
-        calculate_el_dist_le_2 <- function(v,dag_struc){
-            dag = model2network(dag_struc)
-
-            pc <- nbr(dag, v)
-            dist_2 <-  pc
-            for (el in pc){
-                dist_2 <- append(dist_2,nbr(dag, el))
-            }
-            return <- dist_2
-        }
-    '''
-    testy = STAP(r_code, "testy")
-    if "[" not in dag_struc:
-        
-        dag_struc =dependencyInfos.initialize_dag_struc(dag_struc)
-    #Invoking the R function and getting the result
-    dist_le_2 = testy.calculate_el_dist_le_2(v,dag_struc)
-    return sorted(set([el for el in dist_le_2 if el!=v]))
-
-def get_pc(v, dag_struc):
-    r_code = '''
-        library(bnlearn)
-        calculate_pc <- function(v, dag_struc){
-            dag = model2network(dag_struc)
-
-            pc <- nbr(dag, v)
-            return <- pc
-        }
-    '''
-    testy = STAP(r_code, "testy")
-    if "[" not in dag_struc:
-        
-        dag_struc =dependencyInfos.initialize_dag_struc(dag_struc)
-    #Invoking the R function and getting the result
-    dist_le_2 = testy.calculate_pc(v,dag_struc)
-    return sorted(set([el for el in dist_le_2]))
-
-def get_parents(v, dag_struc):
-    r_code = '''
-        library(bnlearn)
-        calculate_parents <- function(v, dag_struc){
-            dag = model2network(dag_struc)
-
-            pa <- parents(dag, v)
-            return <- pa
-        }
-    '''
-    testy = STAP(r_code, "testy")
-    if "[" not in dag_struc:
-        
-        dag_struc =dependencyInfos.initialize_dag_struc(dag_struc)
-    #Invoking the R function and getting the result
-    parents = testy.calculate_parents(v,dag_struc)
-    return sorted(set([el for el in parents]))
-
-def is_descendant(x,y, dag_struc):
-    r_code = '''
-        library(bnlearn)
-        calculate_is_descendant <- function(x,y, dag_struc){
-            dag = model2network(dag_struc)
-            
-            return <- x %in% descendants(dag, y)
-        }
-    '''
-    testy = STAP(r_code, "testy")
-    if "[" not in dag_struc:
-        
-        dag_struc =dependencyInfos.initialize_dag_struc(dag_struc)
-    #Invoking the R function and getting the result
-    is_desc = bool(testy.calculate_is_descendant(x,y,dag_struc)[0])
-    return is_desc
-
-def is_in_pcd(x,y,dag_struc):
-    return x in get_pc(y,dag_struc) or is_descendant(x,y, dag_struc)
-
-def get_dseparation(v,t,z, dag_struc):
-    r_code = '''
-        library(bnlearn)
-        get_dsep <- function(v,t,z, dag_struc){
-            dag = model2network(dag_struc)
-            if (z==""){
-                return <- dsep(dag, v, t)
-            }else{
-                return <- dsep(dag, v, t, z)
-            }
-        }
-    '''
-    testy = STAP(r_code, "testy")
-    #Invoking the R function and getting the result
-    if z == ["()"]:
-        z = ""
-    else:
-        z = robjects.StrVector([el for el in z])
-    if "[" not in dag_struc:
-        
-        dag_struc =dependencyInfos.initialize_dag_struc(dag_struc)
-    dsep = testy.get_dsep(v,t,z, dag_struc)
-    return dsep[0]

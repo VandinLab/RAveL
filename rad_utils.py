@@ -38,30 +38,41 @@ def couple_divider(filename, tot_vars, delta, max_z_size, ds_folder, it_folder):
     couples = [e for e in combinations(tot_vars, 2)]
     deps = []
     indeps = []
-    data_file = ds_folder+filename
-    indep_file = it_folder + "cor_"+filename
-    
-    if os.path.exists(indep_file):
-        try:
-            indep_df = pd.read_csv(indep_file,sep = ";")
-        except:
-            print("!!!",indep_file)
+    oracle = False
+    if oracle:
+        n_rep = 4
+        d_struc = "[A1][B1][C1|A1:B1]" + "".join(["[A"+str(i+1)+"|C"+str(i)+"][B"+str(i+1)+"|C"+str(i)+"][C"+str(i+1)+"|A"+str(i+1)+":B"+str(i+1)+"]" for i in range(1,n_rep+1)])
+        for v1,v2 in couples:
+            if v2 in IT_utils.get_pc(v1, d_struc):
+                deps.append((v1,v2))
+            else:
+                indeps.append((v1,v2))
+    else:
+        data_file = ds_folder+filename
+        indep_file = it_folder + "cor_"+filename
+        
+        if os.path.exists(indep_file):
+            try:
+                indep_df = pd.read_csv(indep_file,sep = ";")
+            except:
+                print("!!!",indep_file)
+                indep_df = pd.DataFrame(columns=["first_term", "second_term", "cond_set", "p_value", "statistic", "lb"])
+                indep_df.to_csv(indep_file, sep = ";")
+        else:
             indep_df = pd.DataFrame(columns=["first_term", "second_term", "cond_set", "p_value", "statistic", "lb"])
             indep_df.to_csv(indep_file, sep = ";")
-    else:
-        indep_df = pd.DataFrame(columns=["first_term", "second_term", "cond_set", "p_value", "statistic", "lb"])
-        indep_df.to_csv(indep_file, sep = ";")
 
-    dep_infos = dependencyInfos(indep_df, method="p-value", independence_method="cor", data_file=data_file, 
-                    indep_file=indep_file, save_every_update=False, independence_language="python")
-    for v1,v2 in couples:
-        other_vars = [v for v in tot_vars if v!= v1 and v!=v2]
-        z = IT_utils.get_argmin_dep(dep_infos,v1,v2,other_vars,delta,max_z_size)
-        if not IT_utils.independence(dep_infos, v1,v2,z, delta):
-            deps.append((v1,v2))
-        else:
-            indeps.append((v1,v2))
-    IT_utils.save_IT_dataframe(dep_infos)
+        dep_infos = dependencyInfos(indep_df, method="p-value", independence_method="cor", data_file=data_file, 
+                        indep_file=indep_file, save_every_update=False, independence_language="python")
+        for v1,v2 in tqdm(couples):
+        # for v1,v2 in couples:
+            other_vars = [v for v in tot_vars if v!= v1 and v!=v2]
+            z = IT_utils.get_argmin_dep(dep_infos,v1,v2,other_vars,delta,max_z_size)
+            if not IT_utils.independence(dep_infos, v1,v2,z, delta):
+                deps.append((v1,v2))
+            else:
+                indeps.append((v1,v2))
+        IT_utils.save_IT_dataframe(dep_infos)
     return deps, indeps
 
 def divide_into_datasets(total_ds, n_vars):
@@ -88,14 +99,13 @@ def select_candidates(tot_vars):
     # print(candidates)
     return dic_els
 
-
 def calculate_residuals(target,data):
     reg = LinearRegression().fit(data, target)
     residuals = target - reg.predict(data)
     # print(residuals.shape)
     return residuals
 
-def calculate_summands(xs,ys,zs = np.array([]), TT ="", corrected_bound = False, my_stat = False, normalize_using_maxes = False):
+def calculate_summands(xs,ys,zs = np.array([]), corrected_bound = False, my_stat = False, normalize_using_maxes = False):
     if not (type(zs)==type(()) and len(zs)==0):
         if zs.shape[0] != 0:
             # better to have normalized data before doing the regression
@@ -134,9 +144,7 @@ def calculate_summands(xs,ys,zs = np.array([]), TT ="", corrected_bound = False,
         else:
             r_summs = np.multiply(xs,ys)/ (n-1) * n
     else:
-        # r_summs = np.sign(np.multiply(xs,ys))
         r_summs = np.multiply(xs,ys) / np.power(np.maximum(np.abs(xs),np.abs(ys)),2)
-        # r_summs = np.multiply(xs,ys) / (np.power(xs,2)+np.power(ys,2))
         if max(r_summs) >1:
             print(np.max(r_summs),np.mean(r_summs))
     return r_summs
@@ -213,7 +221,7 @@ def calculate_stat_ERA_per_var(*args):
             triplets.append((c,tuple(s)))
 
     if len(triplets) > 0:
-        r_mat_uncond = np.array([calculate_summands(data[t[0]].values,data[t[1]].values, corrected_bound = corrected_bound, my_stat=my_stat, normalize_using_maxes = normalize_using_maxes) for t in couples]).T
+        r_mat_uncond = np.array([calculate_summands(xs = data[t[0]].values, ys = data[t[1]].values, corrected_bound = corrected_bound, my_stat=my_stat, normalize_using_maxes = normalize_using_maxes) for t in couples]).T
         if not corrected_bound:
             r_vals = np.sum(r_mat_uncond,axis=0).tolist()
         else:
@@ -224,18 +232,14 @@ def calculate_stat_ERA_per_var(*args):
         sups_vector = np.max(sums,axis = 1)
         step_size = 1000
         for i in range(math.ceil(len(triplets)/step_size)):
-            # print("A")
-            # if i!= 0 and i%10==0:
-            #     print("B")
-            #     break
             #calculate stats for the block
-            r_mat_cond = np.array([calculate_summands(data[t[0][0]].values,data[t[0][1]].values, compose_dataset(data.values,col, selection=t[1]),t, corrected_bound = corrected_bound, my_stat=my_stat, normalize_using_maxes=normalize_using_maxes) 
+            # r_mat_cond = np.array([calculate_summands(xs = data[t[0][0]].values, ys = data[t[0][1]].values, zs = compose_dataset(data.values,col, selection=t[1]), t, corrected_bound = corrected_bound, my_stat=my_stat, normalize_using_maxes=normalize_using_maxes) 
+            #     for t in triplets[i*step_size:(i+1)*step_size]]).T
+            r_mat_cond = np.array([calculate_summands(xs = data[t[0][0]].values, ys = data[t[0][1]].values, zs = compose_dataset(data.values,col, selection=t[1]), corrected_bound = corrected_bound, my_stat=my_stat, normalize_using_maxes=normalize_using_maxes) 
                 for t in triplets[i*step_size:(i+1)*step_size]]).T
-            # print("pt.0")
             sums_cond = np.matmul(sigma_cp.T,r_mat_cond)
             sups_vector = np.maximum(sups_vector, np.max(sums_cond,axis = 1))
             #update stats
-            # print("pt.1")
             if not corrected_bound:
                 r_vals.append(np.sum(r_mat_cond,axis=0).tolist())
             else:
@@ -346,6 +350,10 @@ def calculate_stat_ERA_per_dataset_couple(*args):
 
 
 def calculate_stat_SD_bounds(filename, tot_vars, delta, couples_dict, n_sigma = 1000, corrected_bound = False, n_proc = 1, debug = False, max_z_size = 2, normalize_using_maxes = False, corrected_c = False, my_stat = False):
+    if not corrected_c and not my_stat:
+        print("If you're using the Pearson coefficient you must activate the correction for c and z since\
+            each element of the sum iss not in [-1,1]")
+        raise Exception
     data = pd.read_csv(filename) 
     m = data.shape[0]
     # interval of size 2 with between -1 and 1
@@ -391,6 +399,10 @@ def calculate_stat_SD_bounds(filename, tot_vars, delta, couples_dict, n_sigma = 
     return r_vals, calculate_sup_dev_bound(m, n_sigma, R_tilde, delta, z = z, c = c, get_splitted_values=True), tot_couples, tot_triples
 
 def calculate_stat_SD_bounds_per_couple(filename, tot_vars, delta, n_sigma = 1000, corrected_bound = True, n_proc = 1, debug = False, max_z_size = 2, normalize_using_maxes = False, corrected_c = False, my_stat = False):
+    if not corrected_c and not my_stat:
+        print("If you're using the Pearson coefficient you must activate the correction for c and z since\
+            each element of the sum iss not in [-1,1]")
+        raise Exception
     data = pd.read_csv(filename) 
     m = data.shape[0]
     # interval of size 2 with between -1 and 1
@@ -426,7 +438,11 @@ def calculate_stat_SD_bounds_per_couple(filename, tot_vars, delta, n_sigma = 100
             
     return results_dict
   
-def calculate_stat_SD_bounds_per_group(filename, tot_vars, delta_c, delta_split = 0.05, n_sigma = 1000, max_z_size = 2, normalize_using_maxes = False, corrected_c = False, my_stat = False, thread_limits = 1, corrected_bound = True, n_proc = 1, debug = False, ds_folder = "datasets/multiple13/", it_folder = "IT_results/multiple13/"):
+def calculate_stat_SD_bounds_per_group(filename, tot_vars, delta_c, delta_split = 0.05, n_sigma = 1000, corrected_bound = True, n_proc = 1, debug = False, max_z_size = 2, normalize_using_maxes = False, corrected_c = False, my_stat = False, thread_limits = 1, ds_folder = "datasets/multiple13/", it_folder = "IT_results/multiple13/"):
+    if not corrected_c and not my_stat:
+        print("If you're using the Pearson coefficient you must activate the correction for c and z since\
+            each element of the sum iss not in [-1,1]")
+        raise Exception
     data = pd.read_csv(ds_folder+filename) 
     m = data.shape[0]
     # interval of size 2 with between -1 and 1
@@ -489,6 +505,10 @@ def calculate_stat_SD_bounds_per_group(filename, tot_vars, delta_c, delta_split 
     return results_dict
 
 def calculate_stat_SD_bounds_per_dataset_couple(filename, tot_vars, delta, n_sigma = 1000, corrected_bound = True, n_proc = 1, debug = False, max_z_size = 2, normalize_using_maxes = False, corrected_c = False, my_stat = False):
+    if not corrected_c and not my_stat:
+        print("If you're using the Pearson coefficient you must activate the correction for c and z since\
+            each element of the sum iss not in [-1,1]")
+        raise Exception
     data = pd.read_csv(filename) 
     m = int(data.shape[0]/len(tot_vars))
     # interval of size 2 with between -1 and 1
@@ -564,13 +584,6 @@ def write_on_csv(filename, r_vals, bound_tot_val, tot_couples, tot_triples):
             stats = []
             ups = []
             for k in range(len(r_vals[i][j])):
-                # dat = {"first_term":tot_triples[i][0][j][0][0],
-                #     "second_term":tot_triples[i][0][j][0][1],
-                #     "cond_set": tot_triples[i][0][j][1],
-                #     "lb":r_vals[i][j][k]-bound_tot_val ,
-                #     "stat": r_vals[i][j][k],
-                #     "up": r_vals[i][j][k]+bound_tot_val}
-                # df.append(dat,ignore_index=True)
                 firsts.append(tot_triples[i][0][cumulative][0][0])
                 seconds.append(tot_triples[i][0][cumulative][0][1])
                 conds.append(IT_utils.convert_to_string(tot_triples[i][0][cumulative][1]))
@@ -614,4 +627,14 @@ def write_on_csv_per_couple(filename, results_dict):
         df = pd.concat([df,df2])
     df.to_csv(filename)
 
-
+def get_file_prefixes(computation_type, normalize_using_maxes = False, corrected_c = False, my_stat = False):
+    assert computation_type == "total"
+    if my_stat:
+        return "my_stat_total_"
+    r = ""
+    if normalize_using_maxes:
+        r+="maxN"
+    if corrected_c:
+        r+="corrC"
+    r += "RAD_total_"
+    return r
