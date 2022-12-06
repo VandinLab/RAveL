@@ -12,25 +12,10 @@ test_type = 13
 n_rep = 5
 test_numb = 100
 ds_sizes = [100,250,500,1000,5000,10000,25000,50000,100000,250000]
-test_numb = 10
-ds_sizes = [100,250]
+# test_numb = 10
+# ds_sizes = [100,250]
 
-if not os.path.exists(os.path.join(os.getcwd(), "datasets")):
-    os.mkdir(os.path.join(os.getcwd(), "datasets"))
 path = os.path.join(os.getcwd(), "datasets","multiple"+str(test_type))
-if not os.path.exists(path):
-    os.mkdir(path)
-
-if not os.path.exists(os.path.join(os.getcwd(), "IT_results")):
-    os.mkdir(os.path.join(os.getcwd(), "IT_results"))
-if not os.path.exists(os.path.join(os.getcwd(), "IT_results","total_res")):
-    os.mkdir(os.path.join(os.getcwd(), "IT_results","total_res"))
-if not os.path.exists(os.path.join(os.getcwd(), "IT_results","real_data")):
-    os.mkdir(os.path.join(os.getcwd(), "IT_results","real_data"))
-if not os.path.exists(os.path.join(os.getcwd(), "IT_results","multiple13")):
-    os.mkdir(os.path.join(os.getcwd(), "IT_results","multiple13"))
-if not os.path.exists(os.path.join(os.getcwd(), "pdfs")):
-    os.mkdir(os.path.join(os.getcwd(), "pdfs"))
 
 for n_test in tqdm(range(test_numb)):
     for ext_vars in [0,5,10,15]:

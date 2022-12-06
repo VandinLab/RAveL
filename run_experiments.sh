@@ -1,6 +1,7 @@
 !/bin/env bash
 source ci_venv/bin/activate
 
+python folders_creator.py
 python ids_creator.py
 
 ## Part 1 : RAveL vs SoA algorithms

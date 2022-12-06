@@ -168,7 +168,7 @@ if exp_version == 13:
 
 
 ds_sizes = [100,250,500,1000,5000,10000,25000,50000,100000,250000]
-# ds_sizes = [100,250]  # for debugging
+ds_sizes = [100,250]  # for debugging
 versions = [1]
 ts = [i for i in range(stop_iteration)]
 
@@ -1026,7 +1026,6 @@ if test_number == 777:
 
 # TEST 8: RADEMACHER calculus on Boston housing standard
 if test_number == 8:
-    input_test_number = 75
 
     ############ boston ds 
 
@@ -1045,12 +1044,12 @@ if test_number == 8:
     # LSTAT % lower status of the population 
     # MEDV Median value of owner-occupied homes in $1000's
 
-    delta_input = 0.01
+    # delta_input = 0.01
     vvs = ["CRIM" ,"ZN","INDUS","CHAS","NOX","RM","AGE","DIS","RAD","TAX","PTRATIO","B","LSTAT","MEDV"]
 
     df = pd.read_csv(os.path.join("datasets","real_data","housing.csv"), header=None, delimiter=r"\s+", names = vvs)
     df = df.sample(frac=1, random_state = 120395)
-    df.astype("float64").to_csv(os.path.join("datasets","real_data","housing_shuffled.csv"))    
+    df.astype("float64").to_csv(os.path.join("datasets","real_data","housing_shuffled.csv"))    # just to save it in a nice way
 
     vvs = ["CRIM" ,"ZN","INDUS","CHAS","NOX","RM","AGE","DIS","RAD","TAX","PTRATIO","B","LSTAT"]
     t = "MEDV"
@@ -1081,4 +1080,4 @@ if test_number == 8:
     IT_utils.save_IT_dataframe(dep_infos)
     print()
     print(str(delta)+"MB "+" "+str(res)+"\n")
-    print(str(delta)+"PC "+" "+str(RAveL_PC(dep_infos, t, vvs, delta, 1))+"\n")
+    print(str(delta)+"PC "+" "+str(RAveL_PC(dep_infos, t, vvs, delta, N))+"\n")
